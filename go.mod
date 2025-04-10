@@ -1,8 +1,11 @@
-module playground.com
+module order-processing-pipeline
 
 go 1.24.1
 
-require github.com/restatedev/sdk-go v0.16.0
+require (
+	github.com/restatedev/sdk-go v0.16.0
+	github.com/samber/oops v1.17.0
+)
 
 require (
 	github.com/bahlo/generic-list-go v0.2.0 // indirect
@@ -14,13 +17,15 @@ require (
 	github.com/invopop/jsonschema v0.13.0 // indirect
 	github.com/mailru/easyjson v0.7.7 // indirect
 	github.com/mr-tron/base58 v1.2.0 // indirect
+	github.com/oklog/ulid/v2 v2.1.0 // indirect
+	github.com/samber/lo v1.49.1 // indirect
 	github.com/tetratelabs/wazero v1.9.0 // indirect
 	github.com/wk8/go-ordered-map/v2 v2.1.8 // indirect
-	go.opentelemetry.io/otel v1.28.0 // indirect
-	go.opentelemetry.io/otel/metric v1.28.0 // indirect
-	go.opentelemetry.io/otel/trace v1.28.0 // indirect
+	go.opentelemetry.io/otel v1.29.0 // indirect
+	go.opentelemetry.io/otel/metric v1.29.0 // indirect
+	go.opentelemetry.io/otel/trace v1.29.0 // indirect
 	golang.org/x/net v0.23.0 // indirect
-	golang.org/x/text v0.14.0 // indirect
+	golang.org/x/text v0.21.0 // indirect
 	google.golang.org/protobuf v1.36.5 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 )

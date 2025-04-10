@@ -7,10 +7,10 @@ import (
 	"os"
 	"strconv"
 
-	"github.com/miltkall/components/component_email_service/internal/handler"
 	restate "github.com/restatedev/sdk-go"
 	"github.com/restatedev/sdk-go/server"
 	"github.com/samber/oops"
+	"order-processing-pipeline/internal/handler"
 )
 
 func main() {
@@ -22,15 +22,12 @@ func main() {
 	slog.SetDefault(logger)
 
 	// Create service handlers
-	emailService := handler.NewEmailService()
-	batchEmailService := &handler.BatchEmailService{}
+	orderService := handler.NewOrderService()
 
 	// Create Restate server
 	restateServer := server.NewRestate().
-		// Register the email service
-		Bind(restate.Reflect(emailService)).
-		// Register the batch email service
-		Bind(restate.Reflect(batchEmailService))
+		// Register the order service
+		Bind(restate.Reflect(orderService))
 
 	// Configure Restate authentication if key is provided
 	if key := os.Getenv("RESTATE_PUBLIC_KEY"); key != "" {
@@ -50,10 +47,11 @@ func main() {
 	}
 	address := fmt.Sprintf(":%d", port)
 
-	logger.Info("Starting email service", "address", address)
-	logger.Info("Email service endpoints available at",
-		"sendEmail", fmt.Sprintf("http://localhost:%d/EmailService/SendEmail", port),
-		"batchEmails", fmt.Sprintf("http://localhost:%d/BatchEmailService/ProcessBatch", port))
+	logger.Info("Starting trading system", "address", address)
+	logger.Info("Endpoints available at",
+		"processOrder", fmt.Sprintf("http://localhost:%d/OrderService/ProcessOrder", port),
+		"getOrder", fmt.Sprintf("http://localhost:%d/OrderService/GetOrder", port),
+		"marketEvent", fmt.Sprintf("http://localhost:%d/OrderService/SimulateMarketEvent", port))
 
 	// Start the server with error handling
 	err := restateServer.Start(context.Background(), address)
