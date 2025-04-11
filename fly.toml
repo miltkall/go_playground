@@ -1,7 +1,7 @@
 # See https://fly.io/docs/reference/configuration/ for information about how to use this file.
 
-app = 'order-processing-pipeline'
-primary_region = 'fra'
+app = 'miltkall-go-playground' # run fly app create --generate-name to generate a name
+primary_region = 'fra' # cdg (paris),lhr (london)
 
 [build]
 [build.args]
