@@ -19,6 +19,45 @@ setup-env:
 run:
     go run main.go
 
+# 
+# FLY 
+#
+
+# Deploy the application to Fly.io using the configuration in fly.toml
+[group('fly')]
+deploy:
+    flyctl deploy --build-secret GH_TOKEN=${GITHUB_TOKEN}
+
+# Create new application
+[group('fly')]
+create app-name:
+    flyctl apps create {{app-name}}
+
+
+# Stream application logs from all instances
+[group('fly')]
+logs:
+    flyctl logs
+
+# List all secrets currently set for the application
+[group('fly')]
+secrets-list:
+    flyctl secrets list
+
+# Import DATABASE_URL secret
+[group('fly')]
+secrets-import-db-url:
+    fly secrets set DATABASE_URL=${DATABASE_URL}
+
+# Show current status of the deployed application and its instances
+[group('fly')]
+status:
+    flyctl status
+
+# 
+# Restate
+#
+
 # Register services with Restate
 [group('restate')]
 register:
@@ -28,13 +67,15 @@ register:
 kill inv_id="":
     restate invocations cancel --kill {{inv_id}}
 
-
+# 
+# DEMO
+#
 
 # 1. Simple run (Explain steps + text between ===>)
 # 2. Run it and kill it during execution (cmd just output + UI + show that steps are not rerun)
 
 # Submit a market order
-[group('test')]
+[group('demo')]
 test-passing-order:
     curlie http://localhost:8080/OrderService/ProcessOrder \
     -X POST \
@@ -51,7 +92,7 @@ test-passing-order:
 # 4. the same kill it from the CDM
 
 # Submit an order that will fail during settlement
-[group('test')]
+[group('demo')]
 test-failing-order:
     curlie http://localhost:8080/OrderService/ProcessOrder \
     -X POST \
@@ -67,7 +108,7 @@ test-failing-order:
 # 5. Run it and the next 3 commands (show that commands are getting reverted in case of failure)
 
 # Test order saga processing
-[group('test')]
+[group('demo')]
 test-saga:
     curl http://localhost:8080/OrderSagaService/ProcessOrderWithSaga \
     -X POST \
@@ -81,7 +122,7 @@ test-saga:
     }'
 
 # Submit a saga order that will fail during execution
-[group('test-saga')]
+[group('demo')]
 test-saga-fail-execution:
     curlie http://localhost:8080/OrderSagaService/ProcessOrderWithSaga \
     -X POST \
@@ -95,7 +136,7 @@ test-saga-fail-execution:
     }'
 
 # Submit a saga order that will fail during settlement
-[group('test-saga')]
+[group('demo')]
 test-saga-fail-settlement:
     curlie http://localhost:8080/OrderSagaService/ProcessOrderWithSaga \
     -X POST \
@@ -108,11 +149,11 @@ test-saga-fail-settlement:
       "side": "BUY" \
     }'
 
-# Virtual Objs
-# OpenAPI spec
-# Fly.io (suspention no cost when markets are closed, round rodin load-balancer on the instances)
-# Query DB
 
+
+# 
+# Restate Server
+#
 
 # Start restate server
 [group('restate-server')]
@@ -123,6 +164,15 @@ up:
 [group('restate-server')]
 down:
     docker compose down
+
+
+
+
+# Virtual Objs
+
+# OpenAPI spec
+# Fly.io (suspention no cost when markets are closed, round rodin load-balancer on the instances)
+# Query DB
 
 
 # Value proposition distributed service without having PHD (true!)
