@@ -64,6 +64,8 @@ test-failing-order:
       "side": "BUY" \
     }'
 
+# 5. Run it and the next 3 commands (show that commands are getting reverted in case of failure)
+
 # Test order saga processing
 [group('test')]
 test-saga:
@@ -73,6 +75,34 @@ test-saga:
     -d '{ \
       "account_id": "acc123", \
       "symbol": "AAPL", \
+      "quantity": 100, \
+      "type": "MARKET", \
+      "side": "BUY" \
+    }'
+
+# Submit a saga order that will fail during execution
+[group('test-saga')]
+test-saga-fail-execution:
+    curlie http://localhost:8080/OrderSagaService/ProcessOrderWithSaga \
+    -X POST \
+    -H "Content-Type: application/json" \
+    -d '{ \
+      "account_id": "acc123", \
+      "symbol": "FAIL_DURING_EXECUTION", \
+      "quantity": 100, \
+      "type": "MARKET", \
+      "side": "BUY" \
+    }'
+
+# Submit a saga order that will fail during settlement
+[group('test-saga')]
+test-saga-fail-settlement:
+    curlie http://localhost:8080/OrderSagaService/ProcessOrderWithSaga \
+    -X POST \
+    -H "Content-Type: application/json" \
+    -d '{ \
+      "account_id": "acc123", \
+      "symbol": "FAIL_DURING_SETTLEMENT", \
       "quantity": 100, \
       "type": "MARKET", \
       "side": "BUY" \
