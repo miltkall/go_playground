@@ -48,35 +48,17 @@ run-pretty:
 # FLY 
 #
 
-# Deploy the application to Fly.io using the configuration in fly.toml
-[group('fly')]
-deploy:
-    fly deploy  # --build-secret GH_TOKEN=${GITHUB_TOKEN}
-
-# Create new application
-[group('fly')]
-create app-name:
-    fly apps create {{app-name}}
 
 # Launc application
 [group('fly')]
 launch:
-    fly launch --config fly.toml --local-only --regions "fra,cdg,lhr"
+    -fly app destroy --yes miltkall-go-playground 
+    fly launch --config fly.toml --local-only --regions "fra,cdg,lhr" --now
 
 # Stream application logs from all instances
 [group('fly')]
 logs:
     fly logs
-
-# List all secrets currently set for the application
-[group('fly')]
-secrets-list:
-    fly secrets list
-
-# Import DATABASE_URL secret
-[group('fly')]
-secrets-import-db-url:
-    fly secrets set DATABASE_URL=${DATABASE_URL}
 
 # Show current status of the deployed application and its instances
 [group('fly')]
