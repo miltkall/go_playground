@@ -1,14 +1,12 @@
-# fly.toml app configuration file generated for miltkall-go-playground-blue-night-2134 on 2025-04-11T15:01:42+02:00
+# fly.toml app configuration file generated for miltkall-go-playground on 2025-04-11T15:17:13+02:00
 #
 # See https://fly.io/docs/reference/configuration/ for information about how to use this file.
 #
 
-app = 'miltkall-go-playground' # run fly app create --generate-name to generate a name
-primary_region = 'fra' # cdg (paris),lhr (london)
+app = 'miltkall-go-playground'
+primary_region = 'fra'
 
 [build]
-[build.args]
-GO_VERSION = "1.24.2"
 
 [env]
   RESTATE_PORT = '9080'
