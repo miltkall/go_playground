@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"fmt"
 	"log/slog"
 	"time"
 
@@ -122,6 +123,15 @@ func (s *OrderService) ProcessOrder(ctx restate.Context, request models.OrderReq
 
 		// Simulate settlement work
 		time.Sleep(1 * time.Second)
+
+		// Simulate settlement failure for specific symbols
+		if order.Symbol == "ERROR" {
+			order.Status = models.Failed
+			slog.Error(" Order settlement failed intentionally",
+				"order_id", order.ID,
+				"symbol", order.Symbol)
+			return order, fmt.Errorf("settlement failed for symbol %s", order.Symbol)
+		}
 
 		order.Status = models.Settled
 		order.UpdatedAt = time.Now()
