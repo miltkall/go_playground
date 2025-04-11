@@ -19,14 +19,14 @@ func NewOrderService() *OrderService {
 
 // ProcessOrder is the main workflow that processes an order from validation to settlement
 func (s *OrderService) ProcessOrder(ctx restate.Context, request models.OrderRequest) (*models.OrderResponse, error) {
-	// Create error builder
+	// Create error builder for consistent error formatting
 	errorBuilder := oops.
 		Code("order_processing_error").
 		In("order_handler").
 		With("account_id", request.AccountID).
 		With("symbol", request.Symbol)
 
-	// Generate a unique order ID
+	// Generate a unique order ID - this is deterministic and will be the same on retries
 	orderId := restate.Rand(ctx).UUID().String()
 
 	// Create order with initial status
@@ -43,14 +43,33 @@ func (s *OrderService) ProcessOrder(ctx restate.Context, request models.OrderReq
 		UpdatedAt: time.Now(),
 	}
 
-	slog.Info("Order created",
+	slog.Info("Starting order processing workflow",
 		"order_id", order.ID,
 		"account_id", order.AccountID,
 		"symbol", order.Symbol)
 
-	// Step 1: Validate Order
-	var err error
-	order, err = s.validateOrder(ctx, order)
+	// --------- STEP 1: Validate Order ---------
+	slog.Info("Starting Step 1: Validating order", "order_id", order.ID)
+	validatedOrder, err := restate.Run(ctx, func(runCtx restate.RunContext) (models.Order, error) {
+		slog.Info("Executing validation for order", "order_id", order.ID)
+
+		// Simulate validation work
+		time.Sleep(3 * time.Second)
+
+		// For demonstration, simulate validation logic
+		if order.Symbol == "INVALID" {
+			order.Status = models.Rejected
+			slog.Info("Order rejected: Invalid symbol", "order_id", order.ID)
+			return order, nil
+		}
+
+		order.Status = models.Validated
+		order.UpdatedAt = time.Now()
+		slog.Info("Order validated successfully", "order_id", order.ID)
+
+		return order, nil
+	})
+
 	if err != nil {
 		return nil, errorBuilder.
 			With("step", "validation").
@@ -58,15 +77,47 @@ func (s *OrderService) ProcessOrder(ctx restate.Context, request models.OrderReq
 			Wrapf(err, "Order validation failed")
 	}
 
-	if order.Status == models.Rejected {
-		slog.Info("Order rejected during validation",
-			"order_id", order.ID,
-			"account_id", order.AccountID)
-		return &models.OrderResponse{Order: order}, nil
+	// If the order was rejected during validation, return early
+	if validatedOrder.Status == models.Rejected {
+		slog.Info("Order processing stopped after rejection", "order_id", validatedOrder.ID)
+		return &models.OrderResponse{Order: validatedOrder}, nil
 	}
 
-	// Step 2: Execute Order
-	order, err = s.executeOrder(ctx, order)
+	// Update order reference for next step
+	order = validatedOrder
+
+	// --------- STEP 2: Execute Order ---------
+	slog.Info("Starting Step 2: Executing order", "order_id", order.ID)
+	executedOrder, err := restate.Run(ctx, func(runCtx restate.RunContext) (models.Order, error) {
+		slog.Info("Executing placement for order", "order_id", order.ID)
+
+		// Update order status
+		order.Status = models.Executing
+		order.UpdatedAt = time.Now()
+
+		// Simulate partial fill with delay
+		time.Sleep(2 * time.Second)
+
+		order.FilledQuantity = order.Quantity * 0.5
+		order.Status = models.PartialFill
+		order.UpdatedAt = time.Now()
+		slog.Info("Order partially filled",
+			"order_id", order.ID,
+			"filled_quantity", order.FilledQuantity)
+
+		// Simulate completing the fill with another delay
+		time.Sleep(2 * time.Second)
+
+		order.FilledQuantity = order.Quantity
+		order.Status = models.Filled
+		order.UpdatedAt = time.Now()
+		slog.Info("Order fully filled",
+			"order_id", order.ID,
+			"filled_quantity", order.FilledQuantity)
+
+		return order, nil
+	})
+
 	if err != nil {
 		return nil, errorBuilder.
 			With("step", "execution").
@@ -74,8 +125,26 @@ func (s *OrderService) ProcessOrder(ctx restate.Context, request models.OrderReq
 			Wrapf(err, "Order execution failed")
 	}
 
-	// Step 3: Settle Order
-	order, err = s.settleOrder(ctx, order)
+	// Update order reference for next step
+	order = executedOrder
+
+	// --------- STEP 3: Settle Order ---------
+	slog.Info("Starting Step 3: Settling order", "order_id", order.ID)
+	settledOrder, err := restate.Run(ctx, func(runCtx restate.RunContext) (models.Order, error) {
+		slog.Info("Executing settlement for order", "order_id", order.ID)
+
+		// Simulate settlement work
+		time.Sleep(3 * time.Second)
+
+		order.Status = models.Settled
+		order.UpdatedAt = time.Now()
+		slog.Info("Order settlement completed",
+			"order_id", order.ID,
+			"account_id", order.AccountID)
+
+		return order, nil
+	})
+
 	if err != nil {
 		return nil, errorBuilder.
 			With("step", "settlement").
@@ -83,120 +152,10 @@ func (s *OrderService) ProcessOrder(ctx restate.Context, request models.OrderReq
 			Wrapf(err, "Order settlement failed")
 	}
 
-	slog.Info("Order processed successfully",
-		"order_id", order.ID,
-		"account_id", order.AccountID,
-		"status", order.Status)
+	slog.Info("Order workflow completed successfully",
+		"order_id", settledOrder.ID,
+		"account_id", settledOrder.AccountID,
+		"status", settledOrder.Status)
 
-	return &models.OrderResponse{Order: order}, nil
+	return &models.OrderResponse{Order: settledOrder}, nil
 }
-
-// validateOrder validates the order and updates its status
-func (s *OrderService) validateOrder(ctx restate.Context, order models.Order) (models.Order, error) {
-	// Use Restate.Run to ensure this operation is executed exactly once
-	var validatedOrder models.Order
-	_, err := restate.Run(ctx, func(runCtx restate.RunContext) (restate.Void, error) {
-		slog.Info("Validating order", "order_id", order.ID)
-
-		// Simulating validation logic
-		// In a real implementation, this would check account balance, position limits, etc.
-
-		// For demonstration, simulate some validation logic
-		if order.Symbol == "INVALID" {
-			order.Status = models.Rejected
-			slog.Info("Order rejected: Invalid symbol", "order_id", order.ID)
-		} else {
-			order.Status = models.Validated
-			slog.Info("Order validated successfully", "order_id", order.ID)
-		}
-
-		order.UpdatedAt = time.Now()
-		validatedOrder = order
-
-		return restate.Void{}, nil
-	})
-
-	if err != nil {
-		return order, err
-	}
-
-	return validatedOrder, nil
-}
-
-// executeOrder executes the order on the market
-func (s *OrderService) executeOrder(ctx restate.Context, order models.Order) (models.Order, error) {
-	// Use Restate.Run to ensure this operation is executed exactly once
-	var executedOrder models.Order
-	_, err := restate.Run(ctx, func(runCtx restate.RunContext) (restate.Void, error) {
-		slog.Info("Executing order", "order_id", order.ID)
-
-		// Update order status
-		order.Status = models.Executing
-		order.UpdatedAt = time.Now()
-
-		// Simulate a partial fill
-		order.FilledQuantity = order.Quantity * 0.5
-		order.Status = models.PartialFill
-		order.UpdatedAt = time.Now()
-
-		// Log the partial fill
-		slog.Info("Order partially filled",
-			"order_id", order.ID,
-			"filled_quantity", order.FilledQuantity)
-
-		// Simulate a delay between partial and complete fill
-		err := restate.Sleep(ctx, 2*time.Second)
-		if err != nil {
-			return restate.Void{}, err
-		}
-
-		// Simulate a full fill
-		order.FilledQuantity = order.Quantity
-		order.Status = models.Filled
-		order.UpdatedAt = time.Now()
-
-		// Log the full fill
-		slog.Info("Order fully filled",
-			"order_id", order.ID,
-			"filled_quantity", order.FilledQuantity)
-
-		executedOrder = order
-		return restate.Void{}, nil
-	})
-
-	if err != nil {
-		return order, err
-	}
-
-	return executedOrder, nil
-}
-
-// settleOrder settles the executed order
-func (s *OrderService) settleOrder(ctx restate.Context, order models.Order) (models.Order, error) {
-	// Use Restate.Run to ensure this operation is executed exactly once
-	var settledOrder models.Order
-	_, err := restate.Run(ctx, func(runCtx restate.RunContext) (restate.Void, error) {
-		slog.Info("Settling order", "order_id", order.ID)
-
-		// Update order status
-		order.Status = models.Settled
-		order.UpdatedAt = time.Now()
-
-		// Simulate settlement logic
-		// In a real implementation, this would update account positions, cash balances, etc.
-
-		slog.Info("Order settlement completed",
-			"order_id", order.ID,
-			"account_id", order.AccountID)
-
-		settledOrder = order
-		return restate.Void{}, nil
-	})
-
-	if err != nil {
-		return order, err
-	}
-
-	return settledOrder, nil
-}
-
