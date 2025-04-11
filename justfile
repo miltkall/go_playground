@@ -14,10 +14,35 @@ default:
 setup-env:
     go env -w GOPRIVATE="github.com/miltkall/*"
 
+# -1. Justfile like Makefiles but better and with good shell support
+# 0. Restate consists of the server and function (lamdas)
+#       under the hood (grpc (protobuf) & journals on restate server)
+# Restate website kurz zeigen
+
+
+# 
+# Restate Server
+#
+
+# Start restate server
+[group('restate-server')]
+up:
+    docker compose up  --detach --remove-orphans
+
+# Stop restate server
+[group('restate-server')]
+down:
+    docker compose down
+
+
 
 # Run the trading system
 run:
     go run main.go
+
+# Run the trading system with pretty output
+run-pretty:
+    go run main.go 2>&1 | jq -C '.'
 
 # 
 # FLY 
@@ -26,23 +51,27 @@ run:
 # Deploy the application to Fly.io using the configuration in fly.toml
 [group('fly')]
 deploy:
-    flyctl deploy --build-secret GH_TOKEN=${GITHUB_TOKEN}
+    fly deploy  # --build-secret GH_TOKEN=${GITHUB_TOKEN}
 
 # Create new application
 [group('fly')]
 create app-name:
-    flyctl apps create {{app-name}}
+    fly apps create {{app-name}}
 
+# Launc application
+[group('fly')]
+launch:
+    fly launch --config fly.toml --local-only --regions "fra,cdg,lhr"
 
 # Stream application logs from all instances
 [group('fly')]
 logs:
-    flyctl logs
+    fly logs
 
 # List all secrets currently set for the application
 [group('fly')]
 secrets-list:
-    flyctl secrets list
+    fly secrets list
 
 # Import DATABASE_URL secret
 [group('fly')]
@@ -52,7 +81,7 @@ secrets-import-db-url:
 # Show current status of the deployed application and its instances
 [group('fly')]
 status:
-    flyctl status
+    fly status
 
 # 
 # Restate
@@ -60,12 +89,12 @@ status:
 
 # Register services with Restate
 [group('restate')]
-register:
-    restate -y deployments register --force host.docker.internal:9080
+register HOST="host.docker.internal:9080":
+    restate -y deployments register --force {{HOST}}
 
 [group('restate')]
-kill inv_id="":
-    restate invocations cancel --kill {{inv_id}}
+kill INV_ID="":
+    restate invocations cancel --kill {{INV_ID}}
 
 # 
 # DEMO
@@ -149,36 +178,101 @@ test-saga-fail-settlement:
       "side": "BUY" \
     }'
 
+# 6. init-strategy + get it + UI
+# 7. below + UI
+# 8. above => strategy and orders gets executed
 
+# Initialize a trading strategy
+[group('strategy')]
+init-strategy STRATEGY_ID="demo-strategy123":
+    curlie http://localhost:8080/TradingStrategyService/{{STRATEGY_ID}}/InitializeStrategy \
+    -X POST \
+    -H "Content-Type: application/json" \
+    -d '{ \
+      "order_request": { \
+        "account_id": "acc123", \
+        "symbol": "AAPL", \
+        "quantity": 100, \
+        "type": "MARKET", \
+        "side": "BUY" \
+      }, \
+      "target_price": 185.50, \
+      "price_condition": "ABOVE" \
+    }'
 
-# 
-# Restate Server
-#
+# Get the current state of a strategy
+[group('strategy')]
+get-strategy STRATEGY_ID="demo-strategy123":
+    curlie http://localhost:8080/TradingStrategyService/{{STRATEGY_ID}}/GetStrategy
 
-# Start restate server
-[group('restate-server')]
-up:
-    docker compose up  --detach --remove-orphans
+# Send a price signal below the target (arms the strategy)
+[group('strategy')]
+price-signal-below STRATEGY_ID="demo-strategy123" PRICE="180.25":
+    curlie http://localhost:8080/TradingStrategyService/{{STRATEGY_ID}}/ProcessPriceSignal \
+    -X POST \
+    -H "Content-Type: application/json" \
+    -d '{ \
+      "symbol": "AAPL", \
+      "price": {{PRICE}} \
+    }'
 
-# Stop restate server
-[group('restate-server')]
-down:
-    docker compose down
+# Send a price signal above the target (should trigger if not already triggered)
+[group('strategy')]
+price-signal-above STRATEGY_ID="demo-strategy123" PRICE="190.75":
+    curlie http://localhost:8080/TradingStrategyService/{{STRATEGY_ID}}/ProcessPriceSignal \
+    -X POST \
+    -H "Content-Type: application/json" \
+    -d '{ \
+      "symbol": "AAPL", \
+      "price": {{PRICE}} \
+    }'
 
+# 9. all together
 
+# Demo workflow - run a complete strategy lifecycle
+[group('strategy')]
+demo-workflow:
+    #!/usr/bin/env bash
+    STRATEGY_ID="strategy-$(uuidgen)"
+    echo "Using strategy ID: $STRATEGY_ID"
+    
+    echo "\nStep 1: Initialize strategy"
+    just init-strategy $STRATEGY_ID
+    
+    echo "\nStep 2: Check initial state"
+    just get-strategy $STRATEGY_ID
+    
+    echo "\nStep 3: Send price signal below target (arms strategy)"
+    just price-signal-below $STRATEGY_ID 180.25
+    
+    echo "\nStep 4: Check armed state"
+    just get-strategy $STRATEGY_ID
+    
+    echo "\nStep 5: Send price signal above target (triggers order execution)"
+    just price-signal-above $STRATEGY_ID 186.25
+    
+    echo "\nStep 6: Check final state"
+    just get-strategy $STRATEGY_ID
 
+# 10. fly
 
-# Virtual Objs
+# Fly.io (suspention no cost when markets are closed, round rodin load-balancer on the instances, high availability for multiple regions)
 
-# OpenAPI spec
-# Fly.io (suspention no cost when markets are closed, round rodin load-balancer on the instances)
+# 11. Query 
 # Query DB
 
+#
+# CONCLUSION
+#
 
+# 
 # Value proposition distributed service without having PHD (true!)
 # We concentrate on writing functions (also easily testable) rather then maintaining infra + monoliths!
-
+#
 # Additional use of intenal state and objects
 # Many more examples https://github.com/restatedev/examples
+# Provide clients/openAPI spec to query current state of objects + invocations => useful frontend dev
 # 
-# We can use different languages (python, go, rust)
+# We can use different languages (python, go, rust) !!! => Lots of python trading libs
+#
+# neonDB + wireguard (tailscale) and you have a complete stack!
