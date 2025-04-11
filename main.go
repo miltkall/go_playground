@@ -23,11 +23,13 @@ func main() {
 
 	// Create service handlers
 	orderService := handlers.NewOrderService()
+	orderSagaService := handlers.NewOrderSagaService()
 
 	// Create Restate server
 	restateServer := server.NewRestate().
-		// Register the order service
-		Bind(restate.Reflect(orderService))
+		// Register the services
+		Bind(restate.Reflect(orderService)).
+		Bind(restate.Reflect(orderSagaService))
 
 	// Configure Restate authentication if key is provided
 	if key := os.Getenv("RESTATE_PUBLIC_KEY"); key != "" {
@@ -51,7 +53,8 @@ func main() {
 	logger.Info("Endpoints available at",
 		"processOrder", fmt.Sprintf("http://localhost:%d/OrderService/ProcessOrder", port),
 		"getOrder", fmt.Sprintf("http://localhost:%d/OrderService/GetOrder", port),
-		"marketEvent", fmt.Sprintf("http://localhost:%d/OrderService/SimulateMarketEvent", port))
+		"marketEvent", fmt.Sprintf("http://localhost:%d/OrderService/SimulateMarketEvent", port),
+		"sagaOrderProcessing", fmt.Sprintf("http://localhost:%d/OrderSagaService/ProcessOrderWithSaga", port))
 
 	// Start the server with error handling
 	err := restateServer.Start(context.Background(), address)
