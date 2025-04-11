@@ -7,10 +7,10 @@ import (
 	"os"
 	"strconv"
 
+	"github.com/miltkall/go_playground/internal/handlers"
 	restate "github.com/restatedev/sdk-go"
 	"github.com/restatedev/sdk-go/server"
 	"github.com/samber/oops"
-	"order-processing-pipeline/internal/handler"
 )
 
 func main() {
@@ -22,7 +22,7 @@ func main() {
 	slog.SetDefault(logger)
 
 	// Create service handlers
-	orderService := handler.NewOrderService()
+	orderService := handlers.NewOrderService()
 
 	// Create Restate server
 	restateServer := server.NewRestate().

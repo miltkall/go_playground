@@ -1,4 +1,4 @@
-module order-processing-pipeline
+module github.com/miltkall/go_playground
 
 go 1.24.1
 

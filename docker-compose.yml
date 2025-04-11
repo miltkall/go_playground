@@ -3,8 +3,8 @@ services:
     image: docker.restate.dev/restatedev/restate:1.3
     container_name: restate_dev
     ports:
-      - "8080:8080"
-      - "9070:9070"
-      - "9071:9071"
+      - "8080:8080" # for calling endpoints
+      - "9070:9070" # http://artemis-host:9070/ui/overview
+      - "9071:9071" # restate communication
     extra_hosts:
       - "host.docker.internal:host-gateway"

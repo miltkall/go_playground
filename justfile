@@ -15,7 +15,7 @@ run:
 
 # Register services with Restate
 register:
-    restate -y deployments register --force localhost:9080
+    restate -y deployments register host.docker.internal:9080
 
 # Submit a market order
 [group('test')]
@@ -59,22 +59,6 @@ test-invalid-order:
       "type": "MARKET", \
       "side": "BUY" \
     }'
-
-# Get order status
-[group('test')]
-test-get-order:
-    curl http://localhost:8080/OrderService/GetOrder \
-    -X POST \
-    -H "Content-Type: application/json" \
-    -d '"order123"'
-
-# Simulate a market event
-[group('test')]
-test-market-event:
-    curl http://localhost:8080/OrderService/SimulateMarketEvent \
-    -X POST \
-    -H "Content-Type: application/json" \
-    -d '"PRICE_CHANGE"'
 
 # Setup env
 [group('dependencies')]
