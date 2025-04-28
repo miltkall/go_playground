@@ -19,7 +19,6 @@ setup-env:
 #       under the hood (grpc (protobuf) & journals on restate server)
 # Restate website kurz zeigen
 
-
 # 
 # Restate Server
 #
@@ -32,7 +31,7 @@ up:
 # Stop restate server
 [group('restate-server')]
 down:
-    docker compose down
+    docker compose down --volumes
 
 
 
@@ -165,7 +164,7 @@ test-saga-fail-settlement:
 # 8. above => strategy and orders gets executed
 
 # Initialize a trading strategy
-[group('strategy')]
+[group('demo')]
 init-strategy STRATEGY_ID="demo-strategy123":
     curlie http://localhost:8080/TradingStrategyService/{{STRATEGY_ID}}/InitializeStrategy \
     -X POST \
@@ -183,12 +182,12 @@ init-strategy STRATEGY_ID="demo-strategy123":
     }'
 
 # Get the current state of a strategy
-[group('strategy')]
+[group('demo')]
 get-strategy STRATEGY_ID="demo-strategy123":
     curlie http://localhost:8080/TradingStrategyService/{{STRATEGY_ID}}/GetStrategy
 
 # Send a price signal below the target (arms the strategy)
-[group('strategy')]
+[group('demo')]
 price-signal-below STRATEGY_ID="demo-strategy123" PRICE="180.25":
     curlie http://localhost:8080/TradingStrategyService/{{STRATEGY_ID}}/ProcessPriceSignal \
     -X POST \
@@ -199,7 +198,7 @@ price-signal-below STRATEGY_ID="demo-strategy123" PRICE="180.25":
     }'
 
 # Send a price signal above the target (should trigger if not already triggered)
-[group('strategy')]
+[group('demo')]
 price-signal-above STRATEGY_ID="demo-strategy123" PRICE="190.75":
     curlie http://localhost:8080/TradingStrategyService/{{STRATEGY_ID}}/ProcessPriceSignal \
     -X POST \
@@ -212,7 +211,7 @@ price-signal-above STRATEGY_ID="demo-strategy123" PRICE="190.75":
 # 9. all together
 
 # Demo workflow - run a complete strategy lifecycle
-[group('strategy')]
+[group('demo')]
 demo-workflow:
     #!/usr/bin/env bash
     STRATEGY_ID="strategy-$(uuidgen)"
@@ -236,8 +235,15 @@ demo-workflow:
     echo "\nStep 6: Check final state"
     just get-strategy $STRATEGY_ID
 
-# 10. fly
+# 10.5. OpenAPI + Playground
+# UI, pick one service and show it
 
+# Get openAPI
+[group('demo')]
+openapi:
+    curl -s localhost:9070/services/OrderService/openapi | yq
+
+# 10. fly
 # Fly.io (suspention no cost when markets are closed, round rodin load-balancer on the instances, high availability for multiple regions)
 
 # 11. Query 
