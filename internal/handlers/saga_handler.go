@@ -62,7 +62,7 @@ func (s *OrderSagaService) ProcessOrderWithSaga(ctx restate.Context, request mod
 		// var err error
 
 		// ----- STEP 1: Validate Order -----
-		slog.Info("===> Step 1: Validating order", "order_id", order.ID)
+		slog.Info("2===> Step 1: Validating order", "order_id", order.ID)
 
 		// Simulate validation work
 		time.Sleep(500 * time.Millisecond)
@@ -76,12 +76,12 @@ func (s *OrderSagaService) ProcessOrderWithSaga(ctx restate.Context, request mod
 
 		// Add compensation for validation
 		compensations = append(compensations, func() error {
-			slog.Info("Compensation: Releasing validation reservation", "reservation_id", reservationId)
+			slog.Info("2<===Compensation: Releasing validation reservation", "reservation_id", reservationId)
 			return nil
 		})
 
 		// ----- STEP 2: Execute Order -----
-		slog.Info("===> Step 2: Executing order", "order_id", order.ID)
+		slog.Info("2===> Step 2: Executing order", "order_id", order.ID)
 
 		order.Status = models.Executing
 
@@ -110,12 +110,12 @@ func (s *OrderSagaService) ProcessOrderWithSaga(ctx restate.Context, request mod
 
 		// Add compensation for execution
 		compensations = append(compensations, func() error {
-			slog.Info("Compensation: Cancelling market order", "market_order_id", marketOrderId)
+			slog.Info("2<===Compensation: Cancelling market order", "market_order_id", marketOrderId)
 			return nil
 		})
 
 		// ----- STEP 3: Settle Order -----
-		slog.Info("===> Step 3: Settling order", "order_id", order.ID)
+		slog.Info("2===> Step 3: Settling order", "order_id", order.ID)
 
 		// Create dummy settlement ID
 		settlementId := "stl_" + order.ID
@@ -134,7 +134,7 @@ func (s *OrderSagaService) ProcessOrderWithSaga(ctx restate.Context, request mod
 
 		// Add compensation for settlement
 		compensations = append(compensations, func() error {
-			slog.Info("Compensation: Reversing settlement", "settlement_id", settlementId)
+			slog.Info("2<===Compensation: Reversing settlement", "settlement_id", settlementId)
 			return nil
 		})
 

@@ -50,7 +50,7 @@ func (s *OrderService) ProcessOrder(ctx restate.Context, request models.OrderReq
 		"symbol", order.Symbol)
 
 	// --------- STEP 1: Validate Order ---------
-	slog.Info("====> Starting Step 1: Validating order", "order_id", order.ID)
+	slog.Info("1====> Starting Step 1: Validating order", "order_id", order.ID)
 	validatedOrder, err := restate.Run(ctx, func(runCtx restate.RunContext) (models.Order, error) {
 		slog.Info("Executing validation for order", "order_id", order.ID)
 
@@ -75,7 +75,7 @@ func (s *OrderService) ProcessOrder(ctx restate.Context, request models.OrderReq
 	order = validatedOrder
 
 	// --------- STEP 2: Execute Order ---------
-	slog.Info("====> Starting Step 2: Executing order", "order_id", order.ID)
+	slog.Info("1====> Starting Step 2: Executing order", "order_id", order.ID)
 	executedOrder, err := restate.Run(ctx, func(runCtx restate.RunContext) (models.Order, error) {
 		slog.Info("Executing placement for order", "order_id", order.ID)
 
@@ -117,7 +117,7 @@ func (s *OrderService) ProcessOrder(ctx restate.Context, request models.OrderReq
 	order = executedOrder
 
 	// --------- STEP 3: Settle Order ---------
-	slog.Info("====> Starting Step 3: Settling order", "order_id", order.ID)
+	slog.Info("1====> Starting Step 3: Settling order", "order_id", order.ID)
 	settledOrder, err := restate.Run(ctx, func(runCtx restate.RunContext) (models.Order, error) {
 		slog.Info("Executing settlement for order", "order_id", order.ID)
 
@@ -149,7 +149,7 @@ func (s *OrderService) ProcessOrder(ctx restate.Context, request models.OrderReq
 			Wrapf(err, "Order settlement failed")
 	}
 
-	slog.Info("====> Order workflow completed successfully",
+	slog.Info("1====> Order workflow completed successfully",
 		"order_id", settledOrder.ID,
 		"account_id", settledOrder.AccountID,
 		"status", settledOrder.Status)
