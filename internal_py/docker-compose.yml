@@ -6,7 +6,9 @@ services:
       dockerfile: ./Dockerfile
     image: etl:latest
     container_name: etl
-    network_mode: host
+    # network_mode: host
+    ports:
+      - "9081:9080"
     # volumes:
     #   - ./conf/:/app/conf/:ro
     # environment: 
@@ -21,7 +23,6 @@ services:
             - ./.venv/
             - "**/__pycache__"
             - "**/*.pyc"
-
         # Rebuild on dependency changes
         - action: rebuild
           path: ./pyproject.toml
@@ -31,7 +32,8 @@ services:
           path: ./Dockerfile
     entrypoint: >
       sh -c 'echo "Current time: $$(date)";
-        echo "Started streamlit_dev cont";
+        echo "Started etl cont";
+        uv run /app/main.py;
         sleep infinity;
       done'
     # healthcheck:

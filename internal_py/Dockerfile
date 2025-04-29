@@ -22,6 +22,6 @@ RUN --mount=type=cache,target=/root/.cache/uv \
 WORKDIR /app
 ADD ./src /app
 
-# EXPOSE 8501
+# EXPOSE 9080
 
 ENTRYPOINT ["uv", "run", "/app/main.py"]

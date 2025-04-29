@@ -9,7 +9,7 @@
 # Build images
 [group('docker')]
 build:
-    docker compose --file docker-compose.yml build --no-cache
+    docker compose --file docker-compose.yml build # --no-cache
 
 # Up with watch
 [group('docker')]

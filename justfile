@@ -74,11 +74,16 @@ status:
 # Restate
 #
 
-# Register services with Restate
+# Register golang service to restart server
 [group('restate')]
-register HOST="host.docker.internal:9080":
+register-go HOST="host.docker.internal:9080":
     restate -y deployments register --force {{HOST}}
 
+# Register python service to restart server
+register-python HOST="host.docker.internal:9081":
+    restate -y deployments register --force {{HOST}}
+
+# Kill invocation
 [group('restate')]
 kill INV_ID="":
     restate invocations cancel --kill {{INV_ID}}
