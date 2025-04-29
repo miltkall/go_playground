@@ -6,18 +6,21 @@ default:
     @echo Restate:
     @-restate services status
     @echo
-    @echo Fly:
-    @-fly status
+
+# @echo Fly:
+# @-fly status
 
 # Setup env
 [group('dependencies')]
 setup-env:
     go env -w GOPRIVATE="github.com/miltkall/*"
 
-# -1. Justfile like Makefiles but better and with good shell support
+# -1. Justfile like Makefiles but better and with good shell support & variables
 # 0. Restate consists of the server and function (lamdas)
 #       under the hood (grpc (protobuf) & journals on restate server)
+# 
 # Restate website kurz zeigen
+# 
 
 # 
 # Restate Server
@@ -33,20 +36,23 @@ up:
 down:
     docker compose down --volumes
 
+# 
+# Service
+#
 
-
-# Run the trading system
+# Run the trading system service
+[group('service')]
 run:
     go run main.go
 
-# Run the trading system with pretty output
+# Run the trading system service with pretty output
+[group('service')]
 run-pretty:
     go run main.go 2>&1 | jq -C '.'
 
 # 
 # FLY 
 #
-
 
 # Launc application
 [group('fly')]
@@ -82,7 +88,7 @@ kill INV_ID="":
 #
 
 # 1. Simple run (Explain steps + text between ===>)
-# 2. Run it and kill it during execution (cmd just output + UI + show that steps are not rerun)
+# 2. Run it and kill it during execution (cmd just output + show that steps are not rerun)
 
 # Submit a market order
 [group('demo')]
@@ -98,8 +104,8 @@ test-passing-order:
       "side": "BUY" \
     }'
 
-# 3. Run it (show it is failing in the UI, kill it in UI, show CMD output)
-# 4. the same kill it from the CDM
+# 3. Run it (show it is failing in the UI (:9070), kill it in UI, show CMD output)
+# (4. the same kill it from the CDM)
 
 # Submit an order that will fail during settlement
 [group('demo')]
@@ -118,7 +124,7 @@ test-failing-order:
 # 5. Run it and the next 3 commands (show that commands are getting reverted in case of failure)
 
 # Test order saga processing
-[group('demo')]
+[group('demo-saga')]
 test-saga:
     curl http://localhost:8080/OrderSagaService/ProcessOrderWithSaga \
     -X POST \
@@ -132,7 +138,7 @@ test-saga:
     }'
 
 # Submit a saga order that will fail during execution
-[group('demo')]
+[group('demo-saga')]
 test-saga-fail-execution:
     curlie http://localhost:8080/OrderSagaService/ProcessOrderWithSaga \
     -X POST \
@@ -146,7 +152,7 @@ test-saga-fail-execution:
     }'
 
 # Submit a saga order that will fail during settlement
-[group('demo')]
+[group('demo-saga')]
 test-saga-fail-settlement:
     curlie http://localhost:8080/OrderSagaService/ProcessOrderWithSaga \
     -X POST \
@@ -164,7 +170,7 @@ test-saga-fail-settlement:
 # 8. above => strategy and orders gets executed
 
 # Initialize a trading strategy
-[group('demo')]
+[group('demo-strategy')]
 init-strategy STRATEGY_ID="demo-strategy123":
     curlie http://localhost:8080/TradingStrategyService/{{STRATEGY_ID}}/InitializeStrategy \
     -X POST \
@@ -182,12 +188,12 @@ init-strategy STRATEGY_ID="demo-strategy123":
     }'
 
 # Get the current state of a strategy
-[group('demo')]
+[group('demo-strategy')]
 get-strategy STRATEGY_ID="demo-strategy123":
     curlie http://localhost:8080/TradingStrategyService/{{STRATEGY_ID}}/GetStrategy
 
 # Send a price signal below the target (arms the strategy)
-[group('demo')]
+[group('demo-strategy')]
 price-signal-below STRATEGY_ID="demo-strategy123" PRICE="180.25":
     curlie http://localhost:8080/TradingStrategyService/{{STRATEGY_ID}}/ProcessPriceSignal \
     -X POST \
@@ -198,7 +204,7 @@ price-signal-below STRATEGY_ID="demo-strategy123" PRICE="180.25":
     }'
 
 # Send a price signal above the target (should trigger if not already triggered)
-[group('demo')]
+[group('demo-strategy')]
 price-signal-above STRATEGY_ID="demo-strategy123" PRICE="190.75":
     curlie http://localhost:8080/TradingStrategyService/{{STRATEGY_ID}}/ProcessPriceSignal \
     -X POST \
@@ -208,46 +214,40 @@ price-signal-above STRATEGY_ID="demo-strategy123" PRICE="190.75":
       "price": {{PRICE}} \
     }'
 
-# 9. all together
+# 9. all together (show UI!)
 
 # Demo workflow - run a complete strategy lifecycle
-[group('demo')]
+[group('demo-workflow')]
 demo-workflow:
     #!/usr/bin/env bash
     STRATEGY_ID="strategy-$(uuidgen)"
     echo "Using strategy ID: $STRATEGY_ID"
-    
-    echo "\nStep 1: Initialize strategy"
+    echo
+    echo "===> Step 1: Initialize strategy"
     just init-strategy $STRATEGY_ID
-    
-    echo "\nStep 2: Check initial state"
+    echo
+    echo "===> Step 2: Check initial state"
     just get-strategy $STRATEGY_ID
-    
-    echo "\nStep 3: Send price signal below target (arms strategy)"
+    echo
+    echo "===> Step 3: Send price signal below target (arms strategy)"
     just price-signal-below $STRATEGY_ID 180.25
-    
-    echo "\nStep 4: Check armed state"
+    echo
+    echo "===> Step 4: Check armed state"
     just get-strategy $STRATEGY_ID
-    
-    echo "\nStep 5: Send price signal above target (triggers order execution)"
+    echo
+    echo "===> Step 5: Send price signal above target (triggers order execution)"
     just price-signal-above $STRATEGY_ID 186.25
-    
-    echo "\nStep 6: Check final state"
+    echo
+    echo "===> Step 6: Check final state"
     just get-strategy $STRATEGY_ID
 
 # 10.5. OpenAPI + Playground
 # UI, pick one service and show it
 
 # Get openAPI
-[group('demo')]
+[group('demo-openapi')]
 openapi:
     curl -s localhost:9070/services/OrderService/openapi | yq
-
-# 10. fly
-# Fly.io (suspention no cost when markets are closed, round rodin load-balancer on the instances, high availability for multiple regions)
-
-# 11. Query 
-# Query DB
 
 #
 # CONCLUSION
@@ -257,8 +257,9 @@ openapi:
 # Value proposition distributed service without having PHD (true!)
 # We concentrate on writing functions (also easily testable) rather then maintaining infra + monoliths!
 # We can also use AWS lamdas => No techstack change
-# AWS Training NO PROBLEM! Kann mich bis Beginn besser für die Stelle mich vorbereiten. 
 # We can use different languages (python, go, rust) 
 #
-# neonDB + wireguard (tailscale) and you have a complete stack!
+# Additional Trainings:
+# AWS Training NO PROBLEM! Kann mich bis Beginn besser für die Stelle mich vorbereiten. 
+#
 
