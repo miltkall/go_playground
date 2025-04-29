@@ -167,7 +167,7 @@ test-saga-fail-settlement:
 
 # 6. init-strategy + get it + UI
 # 7. below + UI
-# 8. above => strategy and orders gets executed
+# 8. above => strategy and orders gets executed => THE STRATEGY can very easily be a StVE
 
 # Initialize a trading strategy
 [group('demo-strategy')]
@@ -255,6 +255,7 @@ openapi:
 
 # 
 # Value proposition distributed service without having PHD (true!)
+#
 # We concentrate on writing functions (also easily testable) rather then maintaining infra + monoliths!
 # We can also use AWS lamdas => No techstack change
 # We can use different languages (python, go, rust) 
