@@ -1,0 +1,27 @@
+# Environment variables
+# export VERSION := "latest"
+
+# Show help and list available commands
+[private]
+@default:
+    just --list
+
+# Build images
+[group('docker')]
+build:
+    docker compose --file docker-compose.yml build
+
+# Up with watch
+[group('docker')]
+dev: build
+    docker compose --file docker-compose.yml up --watch
+    
+# Exec into the dev cont
+[group('docker')]
+dev-exec:
+    docker compose --file docker-compose.yml exec interview-py-dev zsh
+
+# Push image to registry
+[group('docker')]
+push: build
+    docker compose --file docker-compose.yml push

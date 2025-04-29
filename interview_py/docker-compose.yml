@@ -1,0 +1,42 @@
+services:
+  interview-py-dev:
+    # depends_on:
+    build:
+      context: .
+      dockerfile: ./Dockerfile
+    image: interview_py:latest
+    container_name: interview_py
+    network_mode: host
+    # volumes:
+    #   - ./conf/:/app/conf/:ro
+    # environment: 
+    # ENV: "test"
+    develop:
+      watch:
+        # Hot reload source code changes
+        - action: sync
+          path: ./src
+          target: /app
+          ignore:
+            - ./.venv/
+            - "**/__pycache__"
+            - "**/*.pyc"
+
+        # Rebuild on dependency changes
+        - action: rebuild
+          path: ./pyproject.toml
+        - action: rebuild
+          path: ./uv.lock
+        - action: rebuild
+          path: ./Dockerfile
+    entrypoint: >
+      sh -c 'echo "Current time: $$(date)";
+        echo "Started streamlit_dev cont";
+        sleep infinity;
+      done'
+    # healthcheck:
+    #   test: [ "CMD", "curl", "--fail", "http://localhost:8501/_stcore/health" ]
+    #   interval: 10s
+    #   timeout: 5s
+    #   retries: 3
+    #   start_period: 20s

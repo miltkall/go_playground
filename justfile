@@ -256,11 +256,9 @@ openapi:
 # 
 # Value proposition distributed service without having PHD (true!)
 # We concentrate on writing functions (also easily testable) rather then maintaining infra + monoliths!
-#
-# Additional use of intenal state and objects
-# Many more examples https://github.com/restatedev/examples
-# Provide clients/openAPI spec to query current state of objects + invocations => useful frontend dev
-# 
-# We can use different languages (python, go, rust) !!! => Lots of python trading libs
+# We can also use AWS lamdas => No techstack change
+# AWS Training NO PROBLEM! Kann mich bis Beginn besser für die Stelle mich vorbereiten. 
+# We can use different languages (python, go, rust) 
 #
 # neonDB + wireguard (tailscale) and you have a complete stack!
+

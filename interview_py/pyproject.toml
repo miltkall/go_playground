@@ -1,0 +1,7 @@
+[project]
+name = "interview_py"
+version = "0.1.0"
+description = "Python interview template"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = []
