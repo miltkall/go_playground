@@ -1,5 +1,5 @@
 import pytest
-from add_numbers import add_numbers
+from main import add_numbers
 
 
 class TestAddNumbers:
