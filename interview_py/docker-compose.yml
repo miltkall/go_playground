@@ -1,42 +1,84 @@
 services:
-  interview-py-dev:
-    # depends_on:
-    build:
-      context: .
-      dockerfile: ./Dockerfile
-    image: interview_py:latest
-    container_name: interview_py
-    network_mode: host
-    # volumes:
-    #   - ./conf/:/app/conf/:ro
-    # environment: 
-    # ENV: "test"
-    develop:
-      watch:
-        # Hot reload source code changes
-        - action: sync
-          path: ./src
-          target: /app
-          ignore:
-            - ./.venv/
-            - "**/__pycache__"
-            - "**/*.pyc"
+  gemis-postgres:
+    image: postgres:17.2-alpine
+    container_name: gemis-postgres
+    ports:
+      - "5433:5433"
+    environment:
+      POSTGRES_USER: gemis
+      POSTGRES_PASSWORD: gemis
+      POSTGRES_DB: gemis
+    volumes:
+      - gemis_postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: [ "CMD-SHELL", "pg_isready --port 5433 --username gemis" ]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    command: -p 5433 # change default port as we have 2 psql running
+    restart: unless-stopped # also starts up on boot
 
-        # Rebuild on dependency changes
-        - action: rebuild
-          path: ./pyproject.toml
-        - action: rebuild
-          path: ./uv.lock
-        - action: rebuild
-          path: ./Dockerfile
-    entrypoint: >
-      sh -c 'echo "Current time: $$(date)";
-        echo "Started interview_py cont";
-        sleep infinity;
-      done'
-    # healthcheck:
-    #   test: [ "CMD", "curl", "--fail", "http://localhost:8501/_stcore/health" ]
-    #   interval: 10s
-    #   timeout: 5s
-    #   retries: 3
-    #   start_period: 20s
+  pgadmin:
+    image: dpage/pgadmin4:9.0.0
+    container_name: pgadmin
+    ports:
+      - "8082:80"
+    environment:
+      PGADMIN_DEFAULT_EMAIL: admin@admin.com
+      PGADMIN_DEFAULT_PASSWORD: admin
+    volumes:
+      - pgadmin_data:/var/lib/pgadmin
+    depends_on:
+      gemis-postgres:
+        condition: service_healthy
+    restart: unless-stopped # also starts up on boot
+
+volumes:
+  gemis_postgres_data:
+    driver: local
+  pgadmin_data:
+    driver: local
+
+# services:
+#   interview-py-dev:
+#     # depends_on:
+#     build:
+#       context: .
+#       dockerfile: ./Dockerfile
+#     image: interview_py:latest
+#     container_name: interview_py
+#     network_mode: host
+#     # volumes:
+#     #   - ./conf/:/app/conf/:ro
+#     # environment: 
+#     # ENV: "test"
+#     develop:
+#       watch:
+#         # Hot reload source code changes
+#         - action: sync
+#           path: ./src
+#           target: /app
+#           ignore:
+#             - ./.venv/
+#             - "**/__pycache__"
+#             - "**/*.pyc"
+
+#         # Rebuild on dependency changes
+#         - action: rebuild
+#           path: ./pyproject.toml
+#         - action: rebuild
+#           path: ./uv.lock
+#         - action: rebuild
+#           path: ./Dockerfile
+#     entrypoint: >
+#       sh -c 'echo "Current time: $$(date)";
+#         echo "Started interview_py cont";
+#         sleep infinity;
+#       done'
+#     # healthcheck:
+#     #   test: [ "CMD", "curl", "--fail", "http://localhost:8501/_stcore/health" ]
+#     #   interval: 10s
+#     #   timeout: 5s
+#     #   retries: 3
+#     #   start_period: 20s

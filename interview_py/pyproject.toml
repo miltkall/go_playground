@@ -5,5 +5,8 @@ description = "Python interview template"
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
+    "pydantic>=2.11.4",
     "pytest>=8.3.5",
+    "requests>=2.32.3",
+    "sqlmodel>=0.0.24",
 ]
