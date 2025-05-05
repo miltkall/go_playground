@@ -97,7 +97,7 @@ kill INV_ID="":
 # 2. Run it and kill it during execution (cmd just output + show that steps are not rerun)
 
 # Submit a market order
-[group('demo')]
+[group('demo-order')]
 test-passing-order:
     curlie http://localhost:8080/OrderService/ProcessOrder \
     -X POST \
@@ -114,7 +114,7 @@ test-passing-order:
 # (4. the same kill it from the CDM)
 
 # Submit an order that will fail during settlement
-[group('demo')]
+[group('demo-order')]
 test-failing-order:
     curlie http://localhost:8080/OrderService/ProcessOrder \
     -X POST \
@@ -255,6 +255,83 @@ demo-workflow:
 openapi:
     curl -s localhost:9070/services/OrderService/openapi | yq
 
+# 11. Solar ETL
+# Test the solar ETL service with valid data
+[group('solar-etl')]
+test-solar-etl:
+    curlie http://localhost:8080/SolarETLService/processSolarData \
+    -X POST \
+    -H "Content-Type: application/json" \
+    -d '{ \
+      "timestamp": "2025-05-04T12:30:00Z", \
+      "plant_id": "solar-plant-1", \
+      "value": 3500.5 \
+    }'
+
+# Test with invalid data (above max)
+[group('solar-etl')]
+test-solar-etl-high:
+    curlie http://localhost:8080/SolarETLService/processSolarData \
+    -X POST \
+    -H "Content-Type: application/json" \
+    -d '{ \
+      "timestamp": "2025-05-04T13:30:00Z", \
+      "plant_id": "solar-plant-1", \
+      "value": 6000.0 \
+    }'
+
+# Test with invalid data (below min)
+[group('solar-etl')]
+test-solar-etl-low:
+    curlie http://localhost:8080/SolarETLService/processSolarData \
+    -X POST \
+    -H "Content-Type: application/json" \
+    -d '{ \
+      "timestamp": "2025-05-04T13:30:00Z", \
+      "plant_id": "solar-plant-1", \
+      "value": -50.0 \
+    }'
+
+# Add a valid value to time series
+[group('solar-etl')]
+add-time-series-value METRIC="power-output" VALUE="150.5":
+    curlie http://localhost:8080/TimeSeriesValidator/{{METRIC}}/addValue \
+    -X POST \
+    -H "Content-Type: application/json" \
+    -d '{ \
+      "timestamp": "2025-05-04T12:30:00Z", \
+      "metric_name": "{{METRIC}}", \
+      "value": {{VALUE}} \
+    }'
+
+# Get history for a metric
+[group('solar-etl')]
+get-time-series-history METRIC="power-output":
+    curlie http://localhost:8080/TimeSeriesValidator/{{METRIC}}/getHistory
+
+# Run a complete demo workflow
+[group('solar-etl')]
+demo-time-series:
+    #!/usr/bin/env bash
+    METRIC="solar-power"
+    echo "Using metric: $METRIC"
+    echo
+    echo "===> Step 1: Add initial value (50.0)"
+    just add-time-series-value $METRIC 50.0
+    echo
+    echo "===> Step 2: Add second value with small increase (75.5)"
+    just add-time-series-value $METRIC 75.5
+    echo
+    echo "===> Step 3: Add third value with moderate increase (125.0)"
+    just add-time-series-value $METRIC 125.0
+    echo
+    echo "===> Step 4: Try to add implausible value (jump of +250.0)"
+    just add-time-series-value $METRIC 375.0
+    echo
+    echo "===> Step 5: Add another valid value (150.0)"
+    just add-time-series-value $METRIC 150.0
+
+
 #
 # CONCLUSION
 #
@@ -266,7 +343,8 @@ openapi:
 # We can also use AWS lamdas => No techstack change
 # We can use different languages (python, go, rust) 
 #
+
+#
 # Additional Trainings:
 # AWS Training NO PROBLEM! Kann mich bis Beginn besser für die Stelle mich vorbereiten. 
 #
-

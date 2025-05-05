@@ -1,77 +1,199 @@
+# internal_py/src/main.py
+import logging
 import uuid
-
 import restate
 from pydantic import BaseModel
-from restate import Service, Context
-from utils import create_recurring_payment, create_subscription
+from typing import List, Optional
+
+# Configure logging
+logging.basicConfig(
+    level=logging.INFO,
+    format="[%(asctime)s] [%(process)d] [%(levelname)s] - %(message)s",
+)
+logger = logging.getLogger(__name__)
 
 
-class SubscriptionRequest(BaseModel):
-    user_id: str
-    credit_card: str
-    subscriptions: list[str]
+# Simple function for test compatibility
+def add_numbers(a, b):
+    """Simple function to add two numbers."""
+    return a + b
 
 
-"""
- Restate helps you implement resilient applications:
-  - Automatic retries
-  - Tracking progress of execution and preventing re-execution of completed work on retries
-  - Providing durable building blocks like timers, promises, and messaging: recoverable and revivable anywhere
-
- Applications consist of services with handlers that can be called over HTTP or Kafka.
- Handlers can be called at http://restate:8080/ServiceName/handlerName
-
- Restate persists and proxies HTTP requests to handlers and manages their execution:
-
- ┌────────┐   ┌─────────┐   ┌────────────────────────────┐
- │ HTTP   │ → │ Restate │ → │ Restate Service (with SDK) │
- │ Client │ ← │         │ ← │   handler1(), handler2()   │
- └────────┘   └─────────┘   └────────────────────────────┘
-
- The SDK lets you implement handlers with regular code and control flow.
- Handlers have access to a Context that provides durable building blocks that get persisted in Restate.
- Whenever a handler uses the Restate Context, an event gets persisted in Restate's log.
- After a failure, a retry is triggered and this log gets replayed to recover the state of the handler.
-"""
-subscription_service = Service("SubscriptionService")
+# ----- Models -----
+class SolarProductionData(BaseModel):
+    timestamp: str
+    plant_id: str
+    value: float
 
 
-@subscription_service.handler()
-async def add(ctx: Context, req: SubscriptionRequest):
-    # Restate persists the result of all `ctx` actions and recovers them after failures
-    # For example, generate a stable idempotency key:
-    payment_id = await ctx.run("payment id", lambda: str(uuid.uuid4()))
+class ValueValidationResult(BaseModel):
+    is_valid: bool
+    reason: Optional[str] = None
+    original_value: float
+    adjusted_value: Optional[float] = None
 
-    # ctx.run persists results of successful actions and skips execution on retries
-    # Failed actions (timeouts, API downtime, etc.) get retried
-    pay_ref = await ctx.run(
-        "recurring payment",
-        lambda: create_recurring_payment(req.credit_card, payment_id),
+
+# ----- First Service: Solar Production ETL -----
+solar_etl_service = restate.Service("SolarETLService")
+
+
+@solar_etl_service.handler()
+async def process_solar_data(
+    ctx: restate.Context, data: SolarProductionData
+) -> ValueValidationResult:
+    """Process solar production data, validate it, and log the result."""
+    # Constants for validation
+    MIN_VALID_VALUE = 0.0
+    MAX_VALID_VALUE = 5000.0  # Example max value for a solar plant in kW
+
+    # Generate a stable ID for idempotency
+    process_id = await ctx.run("process_id", lambda: str(uuid.uuid4()))
+
+    # Validate the data
+    validation_result = await ctx.run(
+        "validate_solar_data",
+        lambda: validate_solar_data(data, MIN_VALID_VALUE, MAX_VALID_VALUE),
     )
 
-    for subscription in req.subscriptions:
-        await ctx.run(
-            "subscription",
-            lambda: create_subscription(req.user_id, subscription, pay_ref),
+    # Log the result as if saving to a database
+    await ctx.run(
+        "log_results", lambda: log_db_operation(process_id, data, validation_result)
+    )
+
+    return validation_result
+
+
+def validate_solar_data(
+    data: SolarProductionData, min_val: float, max_val: float
+) -> ValueValidationResult:
+    """Validate solar data against min/max bounds."""
+    if data.value < min_val:
+        return ValueValidationResult(
+            is_valid=False,
+            reason=f"Value below minimum threshold ({min_val})",
+            original_value=data.value,
+            adjusted_value=min_val,
+        )
+    elif data.value > max_val:
+        return ValueValidationResult(
+            is_valid=False,
+            reason=f"Value above maximum threshold ({max_val})",
+            original_value=data.value,
+            adjusted_value=max_val,
+        )
+    else:
+        return ValueValidationResult(is_valid=True, original_value=data.value)
+
+
+def log_db_operation(
+    process_id: str, data: SolarProductionData, result: ValueValidationResult
+):
+    """Log as if saving to a database."""
+    value_to_save = (
+        result.adjusted_value
+        if result.adjusted_value is not None
+        else result.original_value
+    )
+
+    if result.is_valid:
+        logger.info(
+            f"[DB_SAVE] Process ID: {process_id} - Saved valid solar data: "
+            f"Plant: {data.plant_id}, Time: {data.timestamp}, Value: {value_to_save} kW"
+        )
+    else:
+        logger.info(
+            f"[DB_SAVE] Process ID: {process_id} - Saved adjusted solar data: "
+            f"Plant: {data.plant_id}, Time: {data.timestamp}, Value: {value_to_save} kW "
+            f"(Original: {result.original_value} kW, Reason: {result.reason})"
         )
 
 
-# Create an HTTP endpoint to serve your services on port 9080
-# or use .handler() to run on Lambda, Deno, Bun, Cloudflare Workers, ...
-restate.app([subscription_service]).handle()
+# ----- Second Service: Time Series Validation -----
+time_series_validator = restate.VirtualObject("TimeSeriesValidator")
 
 
+class TimeSeriesData(BaseModel):
+    timestamp: str
+    metric_name: str
+    value: float
 
-"""
-Check the README to learn how to run Restate.
-Then invoke this function and see in the log how it recovers.
-Each action (e.g. "created recurring payment") is only logged once across all retries.
-Retries did not re-execute the successful operations.
 
-curl localhost:8080/SubscriptionService/add -H 'content-type: application/json' -d \
-'{
-    "user_id": "Sam Beckett",
-    "credit_card": "1234-5678-9012-3456",
-    "subscriptions" : ["Netflix", "Disney+", "HBO Max"]
-}'
-"""
+@time_series_validator.handler("addValue")
+async def add_value(
+    ctx: restate.ObjectContext, data: TimeSeriesData
+) -> ValueValidationResult:
+    """Add a value to the time series and validate it against previous values."""
+    # Get historical values for this metric
+    history = await ctx.get(f"history_{data.metric_name}") or []
+
+    # Validate the new value
+    result = validate_time_series_value(data.value, history)
+
+    # If valid, add to history
+    if result.is_valid:
+        # Add the new value to history
+        history.append(data.value)
+
+        # Keep only the latest 100 values to prevent excessive state size
+        if len(history) > 100:
+            history = history[-100:]
+
+        # Save updated history
+        ctx.set(f"history_{data.metric_name}", history)
+
+        logger.info(
+            f"Added valid value {data.value} for metric {data.metric_name} at {data.timestamp}. "
+            f"History now contains {len(history)} values."
+        )
+    else:
+        logger.warning(
+            f"Rejected implausible value {data.value} for metric {data.metric_name} at {data.timestamp}. "
+            f"Reason: {result.reason}"
+        )
+
+    return result
+
+
+# @time_series_validator.handler("getHistory", kind="shared")
+# async def get_history(
+#     ctx: restate.ObjectSharedContext, metric_name: str
+# ) -> List[float]:
+#     """Get the historical values for a metric."""
+#     history = await ctx.get(f"history_{metric_name}") or []
+#     print(history)
+#     return history
+
+
+def validate_time_series_value(
+    value: float, history: List[float]
+) -> ValueValidationResult:
+    """Validate a time series value against its history."""
+    # If no history, accept the value
+    if not history:
+        return ValueValidationResult(is_valid=True, original_value=value)
+
+    # Get the most recent value
+    last_value = history[-1]
+
+    # Check for implausible jumps (more than 100)
+    if abs(value - last_value) > 100:
+        return ValueValidationResult(
+            is_valid=False,
+            reason=f"Value jump too large: {abs(value - last_value)} from previous value {last_value}",
+            original_value=value,
+        )
+
+    return ValueValidationResult(is_valid=True, original_value=value)
+
+
+# Create the application
+app = restate.app([solar_etl_service, time_series_validator])
+
+# Main entry point
+if __name__ == "__main__":
+    import hypercorn
+    import asyncio
+
+    conf = hypercorn.Config()
+    conf.bind = ["0.0.0.0:9080"]
+    asyncio.run(hypercorn.asyncio.serve(app, conf))

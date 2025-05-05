@@ -5,6 +5,7 @@ description = "Python ETL demo"
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
+    "hypercorn>=0.17.3",
     "pydantic>=2.11.3",
     "pytest>=8.3.5",
     "restate-sdk>=0.6.0",
