@@ -80,6 +80,7 @@ register-go HOST="host.docker.internal:9080":
     restate -y deployments register --force {{HOST}}
 
 # Register python service to restart server
+[group('restate')]
 register-python HOST="host.docker.internal:9081":
     restate -y deployments register --force {{HOST}}
 
