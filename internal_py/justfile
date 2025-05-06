@@ -21,6 +21,11 @@ dev:
 dev-exec:
     docker compose --file docker-compose.yml exec etl zsh
 
+# Stop restate server
+[group('docker')]
+down:
+    docker compose down --volumes
+
 # Push image to registry
 [group('docker')]
 push: build
