@@ -1,25 +1,39 @@
 services:
-  gemis-postgres:
+  restate_dev:
+    image: docker.restate.dev/restatedev/restate:1.3
+    container_name: restate_dev
+    ports:
+      - "8080:8080" # for calling endpoints
+      - "9070:9070" # http://localhost:9070/ui/overview
+      - "9071:9071" # restate communication
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    networks:
+      - restate-network
+
+  postgres:
     image: postgres:17.2-alpine
-    container_name: gemis-postgres
+    container_name: postgres
     ports:
       - "5433:5433"
     environment:
-      POSTGRES_USER: gemis
-      POSTGRES_PASSWORD: gemis
-      POSTGRES_DB: gemis
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: postgres
     volumes:
-      - gemis_postgres_data:/var/lib/postgresql/data
+      - postgres_data:/var/lib/postgresql/data
     healthcheck:
-      test: [ "CMD-SHELL", "pg_isready --port 5433 --username gemis" ]
+      test: [ "CMD-SHELL", "pg_isready --port 5433 --username postgres" ]
       interval: 10s
       timeout: 5s
       retries: 3
       start_period: 10s
-    command: -p 5433 # change default port as we have 2 psql running
-    restart: unless-stopped # also starts up on boot
+    command: -p 5433 # change default port
+    restart: unless-stopped
+    networks:
+      - restate-network
 
-  pgadmin:
+  pgadmin: # for inspection
     image: dpage/pgadmin4:9.0.0
     container_name: pgadmin
     ports:
@@ -30,32 +44,42 @@ services:
     volumes:
       - pgadmin_data:/var/lib/pgadmin
     depends_on:
-      gemis-postgres:
+      postgres:
         condition: service_healthy
-    restart: unless-stopped # also starts up on boot
-  interview-py-dev:
-    # depends_on:
+    restart: unless-stopped
+    networks:
+      - restate-network
+
+  apg-etl-service:
     build:
       context: .
-      dockerfile: ./Dockerfile
-    image: interview_py:latest
-    container_name: interview_py
-    network_mode: host
-    # volumes:
-    #   - ./conf/:/app/conf/:ro
-    # environment: 
-    # ENV: "test"
+      dockerfile: Dockerfile
+    container_name: apg-etl-service
+    environment:
+      - DB_HOST=postgres
+      - DB_PORT=5433
+      - DB_USER=postgres
+      - DB_PASSWORD=postgres
+      - DB_NAME=postgres
+    ports:
+      - "9080:9080"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      restate_dev:
+        condition: service_started
+    networks:
+      - restate-network
     develop:
       watch:
         # Hot reload source code changes
         - action: sync
-          path: ./src
+          path: ./
           target: /app
           ignore:
             - ./.venv/
             - "**/__pycache__"
             - "**/*.pyc"
-
         # Rebuild on dependency changes
         - action: rebuild
           path: ./pyproject.toml
@@ -63,20 +87,19 @@ services:
           path: ./uv.lock
         - action: rebuild
           path: ./Dockerfile
-    entrypoint: >
-      sh -c 'echo "Current time: $$(date)";
-        echo "Started interview_py cont";
-        sleep infinity;
-      done'
-    # healthcheck:
-    #   test: [ "CMD", "curl", "--fail", "http://localhost:8501/_stcore/health" ]
-    #   interval: 10s
-    #   timeout: 5s
-    #   retries: 3
-    #   start_period: 20s
+    healthcheck:
+      test: ["CMD", "curl", "--fail", "http://localhost:9080/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
+
+networks:
+  restate-network:
+    driver: bridge
 
 volumes:
-  gemis_postgres_data:
+  postgres_data:
     driver: local
   pgadmin_data:
     driver: local

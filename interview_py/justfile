@@ -1,4 +1,7 @@
-# Environment variables
+# Get history for a specific time series
+[group('apg-etl')]
+get-history:
+    curl http://localhost:8080/TimeSeriesObject/apg_imbalance_austria/get_history# Environment variables
 # export VERSION := "latest"
 
 # Show help and list available commands
@@ -6,27 +9,81 @@
 @default:
     just --list
 
-# Build images
+# 
+# Docker commands
+#
+
+# Build all services
 [group('docker')]
 build:
-    docker compose --file docker-compose.yml build --no-cache
+    docker compose build --no-cache
 
-# Up with watch
+# Start all services in watch mode
 [group('docker')]
 dev:
-    docker compose --file docker-compose.yml up --watch
+    docker compose up --watch
     
-# Exec into the dev cont
-[group('docker')]
-dev-exec:
-    docker compose --file docker-compose.yml exec interview-py-dev zsh
-
-# Stop restate server
+# Stop all services and remove volumes
 [group('docker')]
 down:
     docker compose down --volumes
 
-# Push image to registry
+# Exec into the specified container
 [group('docker')]
-push: build
-    docker compose --file docker-compose.yml push
+exec CONTAINER="apg-etl-service":
+    docker compose exec {{CONTAINER}} bash
+
+#
+# APG ETL Service
+#
+
+# Setup Python virtual environment and install dependencies
+[group('apg-etl')]
+setup-env:
+    python3 -m venv .venv
+    source .venv/bin/activate
+    pip install -e .
+
+# Run the APG ETL service locally
+[group('apg-etl')]
+run-local:
+    python -m hypercorn --config python/tutorials/tour-of-restate-python/hypercorn-config.toml main:app
+
+# Register APG ETL service with Restate
+[group('apg-etl')]
+register:
+    restate deployments register http://localhost:9080 --force
+
+# Trigger data collection manually
+[group('apg-etl')]
+collect-data:
+    curl -X POST http://localhost:8080/APGEtlService/fetch_and_process_data -H "content-type: application/json" -d '{}'
+
+# Schedule periodic data collection (every 5 minutes)
+[group('apg-etl')]
+schedule:
+    curl -X POST http://localhost:8080/APGEtlService/schedule_data_collection -H "content-type: application/json" -d '5'
+
+# Check service health
+[group('apg-etl')]
+health-check:
+    curl http://localhost:8080/HealthService/health
+
+#
+# Development utilities
+#
+
+# Run tests
+[group('dev')]
+test:
+    pytest interview_py/src/test_*.py -v
+
+# Format code with black
+[group('dev')]
+format:
+    black interview_py/src/ *.py
+
+# Run database setup
+[group('dev')]
+init-db:
+    python -c "from db_service import init_db; init_db()"
